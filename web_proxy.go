@@ -6,8 +6,9 @@ import (
 	"sync"
 	"regexp"
 	"io/ioutil"
+	"io"
 	"strings"
-	"nt/http"	// Used only for showing blocked page
+	"net/http"	// Used only for showing blocked page
 )
 
 var goroutineCount int
@@ -114,7 +115,7 @@ func httpsProxy (port string) {
     	fmt.Println(err)
     	return
 	}
-		for {
+	for {
 		// accept good connections
 		conn, err := ln.Accept()
 		if err != nil {
@@ -126,11 +127,15 @@ func httpsProxy (port string) {
 }
 
 func blocked (w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "This website has been blocked!p")
+	io.WriteString(w, "This website has been blocked!")
 }
 
-func isblocked (url string) {
-	
+func isblocked (url string) (result bool) {
+    blockedBytes, err := ioutil.ReadFile("blocklist.txt")
+    if err != nil {
+        return
+    }
+    return false
 }
 
 func main () {
