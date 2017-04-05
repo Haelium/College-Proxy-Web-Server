@@ -105,6 +105,7 @@ func httpProxy (port string) {
     	fmt.Println(err)
     	return
 	}
+	go clearCache()		// Spawn goroutine to clear cache periodically
 
 	for {
 		// accept good connections
@@ -205,7 +206,6 @@ func main () {
 
 	go httpProxy(":13337")		// Spawn goroutine for httpProxy listener
 	go httpsProxy(":14488")		// Spawn goroutine for httpsProxy listener
-	go clearCache()				// Spawn goroutine to clear cache periodically
 
 	done <- true
 }
