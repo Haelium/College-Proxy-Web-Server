@@ -8,10 +8,10 @@ import (
 	"io/ioutil"
 	"io"
 	"strings"
-	"net/http"	// Used only for showing blocked page
 	"os"
 	"bufio"
 	"bytes"
+	"time"
 )
 
 var goroutineCount int
@@ -47,43 +47,46 @@ func webProxy (conn net.Conn) {
 	// Extract URL and check if it is blocked
 	targetURL := urlRegexp.Find(requestBuf)
 	if blockedResult := isBlocked(string(targetURL)); blockedResult == false {
-		// Check if website should be blocked
+		// Check if website should be blocked:
 
 		fmt.Println(len(cache.m))
-		// Check if message exists in cache and return from function
+		// Check if message exists in cache and return cached entry if possible
 		cache.RLock()
 		cachedResponse, existsInCache := cache.m[string(requestBuf)]
 		cache.RUnlock()
-
+		// If message exists in cache, respond from cache and return
 		if existsInCache == true {
 			fmt.Println("Responding from cache")
 			conn.Write([]byte(cachedResponse))
 			return
 		}
-
+		// Remove http:// from url to find target domain name dial it
 		targetURL = []byte(strings.Replace(string(targetURL), "http://", "", 1))
 		proxyConn, err := net.Dial("tcp", string(targetURL) + ":80")
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		proxyConn.Write(requestBuf)
-		response, err := ioutil.ReadAll(proxyConn)
+		
+		proxyConn.Write(requestBuf)					// Forward user's GET request to the target
+		response, err := ioutil.ReadAll(proxyConn)	// Read the response from server
 		if err != nil {
 			return
 		}
-		conn.Write(response)
+		conn.Write(response)						// Forward response from server to the user
 
 		fmt.Println(string(response))
 
-		// push into cache
-		cache.Lock()
-		cache.m[string(requestBuf)] = string(response)
-		cache.Unlock()
+		// push into cache if it did not exist in cache before
+		if existsInCache == false {
+			cache.Lock()
+			cache.m[string(requestBuf)] = string(response)
+			cache.Unlock()
+		}
 		
 		return
 
-	} else {
+	} else {	// If the domain is blocked
 		// Send the user a page informing him/her that the content is blocked
 		conn.Write([]byte(	`<html>
 							<title>Blocked</title><h1>Blocked!</h1>
@@ -184,11 +187,25 @@ func isBlocked (url string) (result bool) {
     return false
 }
 
+func clearCache () {
+	// This function should check the size of the cache every 30 seconds and clear it if the size is too big
+	for {
+		time.Sleep(30 * time.Second)	// Every 30 seconds
+		if (len(cache.m) > 1000) {		// Check if there are over 1000 items in cache
+			fmt.Println("Clearing page response cache")
+			cache.Lock()
+			cache.m = make(map[string]string)	// Create a new empty map (garbage collection removes the old map)
+			cache.Unlock()
+		}
+	}
+}
+
 func main () {
 	done := make(chan bool)
 
-	go httpProxy(":13337")
-	go httpsProxy(":14488")
+	go httpProxy(":13337")		// Spawn goroutine for httpProxy listener
+	go httpsProxy(":14488")		// Spawn goroutine for httpsProxy listener
+	go clearCache()				// Spawn goroutine to clear cache periodically
 
 	done <- true
 }
