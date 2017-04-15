@@ -142,7 +142,6 @@ func httpsProxy (port string) {
 	}
 }
 
-// Code based on http://stackoverflow.com/questions/8757389/reading-file-line-by-line-in-go answer by user: "a-h"
 func isBlocked (url string) (result bool) {
 	urlMatch := strings.Replace(url, "http://", "", 1)
 
